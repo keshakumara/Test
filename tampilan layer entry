@@ -1,0 +1,415 @@
+File pubspec.yaml:
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: any
+  path provider: any
+  
+
+File db.helpers:
+
+import 'package:flutterdb/models/contact.dart';
+import 'package:sqflite/sqflite.dart';
+import 'dart:async';
+//mendukug pemrograman asinkron
+import 'dart:io';
+//bekerja pada file dan directory
+import 'package:path_provider/path_provider.dart';
+//pubspec.yml
+
+//kelass Dbhelper
+class DbHelper {
+  static DbHelper _dbHelper = DbHelper._createObject();
+  static late final Database _database;
+
+  DbHelper._createObject();
+
+  factory DbHelper() {
+    return _dbHelper;
+  }
+
+  Future<Database> initDb() async {
+    //untuk menentukan nama database dan lokasi yg dibuat
+    Directory directory = await getApplicationDocumentsDirectory();
+    String path = directory.path + 'contact.db';
+
+    //create, read databases
+    var todoDatabase = openDatabase(path, version: 1, onCreate: _createDb);
+
+    //mengembalikan nilai object sebagai hasil dari fungsinya
+    return todoDatabase;
+  }
+
+  //buat tabel baru dengan nama contact
+  void _createDb(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE contact (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        phone TEXT
+      )
+    ''');
+  }
+
+  Future<Database> get database async {
+    // ignore: unnecessary_null_comparison
+    if (_database == null) {
+      _database = await initDb();
+    }
+    return _database;
+  }
+
+  Future<List<Map<String, dynamic>>> select() async {
+    Database db = await this.database;
+    var mapList = await db.query('contact', orderBy: 'name');
+    return mapList;
+  }
+
+//create databases
+  Future<int> insert(Contact object) async {
+    Database db = await this.database;
+    int count = await db.insert('contact', object.toMap());
+    return count;
+  }
+
+//update databases
+  Future<int> update(Contact object) async {
+    Database db = await this.database;
+    int count = await db.update('contact', object.toMap(),
+        where: 'id=?', whereArgs: [object.id]);
+    return count;
+  }
+
+//delete databases
+  Future<int> delete(int id) async {
+    Database db = await this.database;
+    int count = await db.delete('contact', where: 'id=?', whereArgs: [id]);
+    return count;
+  }
+
+  Future<List<Contact>> getContactList() async {
+    var contactMapList = await select();
+    int count = contactMapList.length;
+    List<Contact> contactList = <Contact>[];
+    for (int i = 0; i < count; i++) {
+      contactList.add(Contact.fromMap(contactMapList[i]));
+    }
+    return contactList;
+  }
+}
+
+
+File contact.dart:
+
+class Contact {
+  late int _id;
+  late String _name;
+  late String _phone;
+
+  // konstruktor versi 1
+  Contact(this._name, this._phone);
+
+  // konstruktor versi 2: konversi dari Map ke Contact
+  Contact.fromMap(Map<String, dynamic> map) {
+    this._id = map['id'];
+    this._name = map['name'];
+    this._phone = map['phone'];
+  }
+  //getter dan setter (mengambil dan mengisi data kedalam object)
+  // getter
+  int get id => _id;
+  // ignore: unnecessary_getters_setters
+  String get name => _name;
+  // ignore: unnecessary_getters_setters
+  String get phone => _phone;
+
+  // setter
+  // ignore: unnecessary_getters_setters
+  set name(String value) {
+    _name = value;
+  }
+
+  // ignore: unnecessary_getters_setters
+  set phone(String value) {
+    _phone = value;
+  }
+
+  // konversi dari Contact ke Map
+  Map<String, dynamic> toMap() {
+    Map<String, dynamic> map = Map<String, dynamic>();
+    map['id'] = this._id;
+    map['name'] = name;
+    map['phone'] = phone;
+    return map;
+  }
+}
+
+
+File entryform.dart:
+
+import 'package:flutter/material.dart';
+import 'package:flutterdb/models/contact.dart';
+
+class EntryForm extends StatefulWidget {
+  final Contact contact;
+
+  EntryForm(this.contact);
+
+  @override
+  EntryFormState createState() => EntryFormState(this.contact);
+}
+
+//class controller
+class EntryFormState extends State<EntryForm> {
+  Contact contact;
+
+  EntryFormState(this.contact);
+
+  TextEditingController nameController = TextEditingController();
+  TextEditingController phoneController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    //kondisi
+    nameController.text = contact.name;
+    phoneController.text = contact.phone;
+    //rubah
+    return Scaffold(
+        appBar: AppBar(
+          // ignore: unnecessary_null_comparison
+          title: contact == null ? Text('Tambah') : Text('Rubah'),
+          leading: Icon(Icons.keyboard_arrow_left),
+        ),
+        body: Padding(
+          padding: EdgeInsets.only(top: 15.0, left: 10.0, right: 10.0),
+          child: ListView(
+            children: <Widget>[
+              // nama
+              Padding(
+                padding: EdgeInsets.only(top: 20.0, bottom: 20.0),
+                child: TextField(
+                  controller: nameController,
+                  keyboardType: TextInputType.text,
+                  decoration: InputDecoration(
+                    labelText: 'Nama Lengkap',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(5.0),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    //
+                  },
+                ),
+              ),
+
+              // telepon
+              Padding(
+                padding: EdgeInsets.only(top: 20.0, bottom: 20.0),
+                child: TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Telepon',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(5.0),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    //
+                  },
+                ),
+              ),
+
+              // tombol button
+              Padding(
+                padding: EdgeInsets.only(top: 20.0, bottom: 20.0),
+                child: Row(
+                  children: <Widget>[
+                    // tombol simpan
+                    Expanded(
+                      // ignore: deprecated_member_use
+                      child: RaisedButton(
+                        color: Theme.of(context).primaryColorDark,
+                        textColor: Theme.of(context).primaryColorLight,
+                        child: Text(
+                          'Save',
+                          textScaleFactor: 1.5,
+                        ),
+                        onPressed: () {
+                          // ignore: unnecessary_null_comparison
+                          if (contact == null) {
+                            // tambah data
+                            contact = Contact(
+                                nameController.text, phoneController.text);
+                          } else {
+                            // ubah data
+                            contact.name = nameController.text;
+                            contact.phone = phoneController.text;
+                          }
+                          // kembali ke layar sebelumnya dengan membawa objek contact
+                          Navigator.pop(context, contact);
+                        },
+                      ),
+                    ),
+                    Container(
+                      width: 5.0,
+                    ),
+                    // tombol batal
+                    Expanded(
+                      // ignore: deprecated_member_use
+                      child: RaisedButton(
+                        color: Theme.of(context).primaryColorDark,
+                        textColor: Theme.of(context).primaryColorLight,
+                        child: Text(
+                          'Cancel',
+                          textScaleFactor: 1.5,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ));
+  }
+}
+
+
+File home.dart:
+
+import 'package:flutter/material.dart';
+//letak package folder flutter
+import 'package:flutterdb/ui/entryform.dart';
+import 'package:flutterdb/models/contact.dart';
+import 'package:flutterdb/helpers/dbhelpers.dart';
+import 'package:sqflite/sqflite.dart';
+//untuk memanggil fungsi yg terdapat di daftar pustaka sqflite
+import 'dart:async';
+
+import 'entryform.dart';
+//pendukung program asinkron
+
+class Home extends StatefulWidget {
+  @override
+  HomeState createState() => HomeState();
+}
+
+class HomeState extends State<Home> {
+  DbHelper dbHelper = DbHelper();
+  int count = 0;
+  List<Contact>? contactList;
+
+  @override
+  Widget build(BuildContext context) {
+    if (contactList == null) {
+      contactList = <Contact>[];
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Daftar Data-Data'),
+      ),
+      body: createListView(),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        tooltip: 'Tambah Data',
+        onPressed: () async {
+          // ignore: unnecessary_statements
+          var contact2 = Contact(" ", " ");
+          var contact = await navigateToEntryForm(context, contact2);
+          // ignore: unnecessary_null_comparison
+          if (contact != null) addContact(contact);
+        },
+      ),
+    );
+  }
+
+  Future<Contact> navigateToEntryForm(
+      BuildContext context, Contact contact) async {
+    var result = await Navigator.push(context,
+        MaterialPageRoute(builder: (BuildContext context) {
+      return EntryForm(contact);
+    }));
+    return result;
+  }
+
+  ListView createListView() {
+    TextStyle? textStyle = Theme.of(context).textTheme.subtitle1;
+    return ListView.builder(
+      itemCount: count,
+      itemBuilder: (BuildContext context, int index) {
+        return Card(
+          color: Colors.white,
+          elevation: 2.0,
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.red,
+              child: Icon(Icons.people),
+            ),
+            title: Text(
+              this.contactList![index].name,
+              style: textStyle,
+            ),
+            subtitle: Text(this.contactList![index].phone),
+            trailing: GestureDetector(
+              child: Icon(Icons.delete),
+              onTap: () {
+                deleteContact(contactList![index]);
+              },
+            ),
+            onTap: () async {
+              var contact =
+                  await navigateToEntryForm(context, this.contactList![index]);
+              editContact(contact);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  //buat contact
+  void addContact(Contact object) async {
+    int result = await dbHelper.insert(object);
+    if (result > 0) {
+      updateListView();
+    }
+  }
+
+  //edit contact
+  void editContact(Contact object) async {
+    int result = await dbHelper.update(object);
+    if (result > 0) {
+      updateListView();
+    }
+  }
+
+  //delete contact
+  void deleteContact(Contact object) async {
+    int result = await dbHelper.delete(object.id);
+    if (result > 0) {
+      updateListView();
+    }
+  }
+
+  //update contact
+  void updateListView() {
+    final Future<Database> dbFuture = dbHelper.initDb();
+    dbFuture.then((database) {
+      Future<List<Contact>> contactListFuture = dbHelper.getContactList();
+      contactListFuture.then((contactList) {
+        setState(() {
+          this.contactList = contactList;
+          this.count = contactList.length;
+        });
+      });
+    });
+  }
+}
+
+
